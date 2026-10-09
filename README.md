@@ -41,9 +41,11 @@ Các truy vấn mẫu nằm trong `clickhouse/analytics.sql`.
 
 ## Dừng / dọn
 
+Dữ liệu Kafka và ClickHouse được lưu trong named volume (`kafka_data`, `clickhouse_data`) nên **không mất** khi dừng hoặc restart.
+
 ```bash
-docker compose down        # giữ image
-docker compose down -v     # xóa luôn dữ liệu
+docker compose down        # dừng, GIỮ dữ liệu
+docker compose down -v     # dừng và XÓA toàn bộ dữ liệu
 ```
 
 > Khi đổi schema trong `init.sql`, cần `docker compose down -v` rồi `up -d` lại, vì init chỉ chạy khi ClickHouse khởi tạo lần đầu.

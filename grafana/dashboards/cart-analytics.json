@@ -82,6 +82,36 @@
       "options": { "orientation": "horizontal", "xField": "product_id", "legend": { "showLegend": false } },
       "targets": [{ "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "format": 1, "queryType": "table",
         "rawSql": "SELECT product_id, sum(price * quantity) AS revenue FROM cart_events_storage WHERE action = 'CHECKOUT' AND $__timeFilter(timestamp) GROUP BY product_id ORDER BY revenue DESC LIMIT 10" }]
+    },
+    {
+      "id": 9, "type": "table", "title": "Giỏ hàng bị bỏ quên (chưa thanh toán, im lặng > 30 giây) - ứng viên gửi voucher",
+      "gridPos": { "h": 10, "w": 16, "x": 0, "y": 23 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": { "defaults": {}, "overrides": [
+        { "matcher": { "id": "byName", "options": "cart_value_vnd" }, "properties": [ { "id": "unit", "value": "none" }, { "id": "decimals", "value": 0 }, { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } }, { "id": "color", "value": { "mode": "continuous-YlRd" } } ] },
+        { "matcher": { "id": "byName", "options": "idle_seconds" }, "properties": [ { "id": "unit", "value": "s" } ] }
+      ] },
+      "options": { "showHeader": true, "sortBy": [ { "displayName": "cart_value_vnd", "desc": true } ] },
+      "targets": [{ "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "format": 1, "queryType": "table",
+        "rawSql": "SELECT session_id, any(user_id) AS user_id, sum(if(action = 'ADD_TO_CART', quantity * price, 0)) - sum(if(action = 'REMOVE_FROM_CART', quantity * price, 0)) AS cart_value_vnd, max(timestamp) AS last_seen, dateDiff('second', max(timestamp), now()) AS idle_seconds FROM cart_events_storage WHERE $__timeFilter(timestamp) GROUP BY session_id HAVING countIf(action = 'CHECKOUT') = 0 AND cart_value_vnd > 0 AND idle_seconds > 30 ORDER BY cart_value_vnd DESC LIMIT 15" }]
+    },
+    {
+      "id": 10, "type": "stat", "title": "Số giỏ hàng bị bỏ quên",
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 23 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "#F2495C" } }, "overrides": [] },
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "format": 1, "queryType": "table",
+        "rawSql": "SELECT count() AS abandoned_carts FROM (SELECT session_id, sum(if(action = 'ADD_TO_CART', quantity * price, 0)) - sum(if(action = 'REMOVE_FROM_CART', quantity * price, 0)) AS cart_value, max(timestamp) AS last_seen, countIf(action = 'CHECKOUT') AS paid FROM cart_events_storage WHERE $__timeFilter(timestamp) GROUP BY session_id) WHERE paid = 0 AND cart_value > 0 AND dateDiff('second', last_seen, now()) > 30" }]
+    },
+    {
+      "id": 11, "type": "stat", "title": "Giá trị hàng bị bỏ quên (VND)",
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 28 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": { "defaults": { "unit": "none", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "#FA6400" } }, "overrides": [] },
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "format": 1, "queryType": "table",
+        "rawSql": "SELECT sum(cart_value) AS abandoned_value FROM (SELECT session_id, sum(if(action = 'ADD_TO_CART', quantity * price, 0)) - sum(if(action = 'REMOVE_FROM_CART', quantity * price, 0)) AS cart_value, max(timestamp) AS last_seen, countIf(action = 'CHECKOUT') AS paid FROM cart_events_storage WHERE $__timeFilter(timestamp) GROUP BY session_id) WHERE paid = 0 AND cart_value > 0 AND dateDiff('second', last_seen, now()) > 30" }]
     }
   ]
 }
