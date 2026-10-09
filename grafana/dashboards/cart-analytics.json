@@ -1,0 +1,87 @@
+{
+  "uid": "rca-main",
+  "title": "Real-time Cart Analytics",
+  "tags": ["ecommerce", "clickhouse", "kafka"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Tổng sự kiện",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "#5794F2" } }, "overrides": [] },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "format": 1, "queryType": "table",
+        "rawSql": "SELECT count() AS events FROM cart_events_storage WHERE $__timeFilter(timestamp)" }]
+    },
+    {
+      "id": 2, "type": "stat", "title": "Phiên hoạt động (1 phút gần nhất)",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "#B877D9" } }, "overrides": [] },
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "format": 1, "queryType": "table",
+        "rawSql": "SELECT uniqExact(session_id) AS sessions FROM cart_events_storage WHERE timestamp > now() - INTERVAL 1 MINUTE" }]
+    },
+    {
+      "id": 3, "type": "stat", "title": "Tỷ lệ chuyển đổi (xem → thanh toán)",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": { "defaults": { "unit": "percent", "decimals": 2, "color": { "mode": "fixed", "fixedColor": "#73BF69" } }, "overrides": [] },
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "format": 1, "queryType": "table",
+        "rawSql": "SELECT round(uniqExactIf(session_id, action = 'CHECKOUT') * 100 / nullIf(uniqExactIf(session_id, action = 'VIEW_PRODUCT'), 0), 2) AS conversion FROM cart_events_storage WHERE $__timeFilter(timestamp)" }]
+    },
+    {
+      "id": 4, "type": "stat", "title": "Doanh thu (VND)",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": { "defaults": { "unit": "none", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "#FF9830" } }, "overrides": [] },
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "format": 1, "queryType": "table",
+        "rawSql": "SELECT sum(price * quantity) AS revenue FROM cart_events_storage WHERE action = 'CHECKOUT' AND $__timeFilter(timestamp)" }]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Sự kiện theo thời gian (theo loại hành động)",
+      "gridPos": { "h": 9, "w": 16, "x": 0, "y": 4 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 70, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [{ "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "format": 0, "queryType": "timeseries",
+        "rawSql": "SELECT $__timeInterval(timestamp) AS time, action, count() AS events FROM cart_events_storage WHERE $__timeFilter(timestamp) GROUP BY time, action ORDER BY time" }]
+    },
+    {
+      "id": 6, "type": "bargauge", "title": "Phễu chuyển đổi (số phiên)",
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 4 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": { "defaults": { "color": { "mode": "continuous-GrYlRd" }, "min": 0 }, "overrides": [] },
+      "options": { "orientation": "horizontal", "displayMode": "gradient", "reduceOptions": { "values": true, "fields": "/^sessions$/", "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "format": 1, "queryType": "table",
+        "rawSql": "SELECT '1. Xem sản phẩm' AS stage, uniqExactIf(session_id, action = 'VIEW_PRODUCT') AS sessions FROM cart_events_storage WHERE $__timeFilter(timestamp) UNION ALL SELECT '2. Thêm vào giỏ', uniqExactIf(session_id, action = 'ADD_TO_CART') FROM cart_events_storage WHERE $__timeFilter(timestamp) UNION ALL SELECT '3. Thanh toán', uniqExactIf(session_id, action = 'CHECKOUT') FROM cart_events_storage WHERE $__timeFilter(timestamp)" }]
+    },
+    {
+      "id": 7, "type": "table", "title": "Top 10 sản phẩm bị bỏ giỏ nhiều nhất",
+      "gridPos": { "h": 10, "w": 14, "x": 0, "y": 13 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": { "defaults": {}, "overrides": [
+        { "matcher": { "id": "byName", "options": "remove_rate_pct" }, "properties": [ { "id": "unit", "value": "percent" }, { "id": "custom.cellOptions", "value": { "type": "gauge", "mode": "gradient" } }, { "id": "max", "value": 100 }, { "id": "min", "value": 0 } ] },
+        { "matcher": { "id": "byName", "options": "abandon_rate_pct" }, "properties": [ { "id": "unit", "value": "percent" }, { "id": "custom.cellOptions", "value": { "type": "gauge", "mode": "gradient" } }, { "id": "max", "value": 100 }, { "id": "min", "value": 0 } ] }
+      ] },
+      "options": { "showHeader": true },
+      "targets": [{ "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "format": 1, "queryType": "table",
+        "rawSql": "SELECT product_id, countIf(action = 'ADD_TO_CART') AS adds, countIf(action = 'REMOVE_FROM_CART') AS removes, countIf(action = 'CHECKOUT') AS purchases, round(removes * 100 / nullIf(adds, 0), 1) AS remove_rate_pct, round((adds - purchases) * 100 / nullIf(adds, 0), 1) AS abandon_rate_pct FROM cart_events_storage WHERE $__timeFilter(timestamp) GROUP BY product_id HAVING adds >= 3 ORDER BY (adds - purchases) DESC LIMIT 10" }]
+    },
+    {
+      "id": 8, "type": "barchart", "title": "Top 10 sản phẩm theo doanh thu (VND)",
+      "gridPos": { "h": 10, "w": 10, "x": 14, "y": 13 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "#FF9830" } }, "overrides": [] },
+      "options": { "orientation": "horizontal", "xField": "product_id", "legend": { "showLegend": false } },
+      "targets": [{ "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" }, "editorType": "sql", "format": 1, "queryType": "table",
+        "rawSql": "SELECT product_id, sum(price * quantity) AS revenue FROM cart_events_storage WHERE action = 'CHECKOUT' AND $__timeFilter(timestamp) GROUP BY product_id ORDER BY revenue DESC LIMIT 10" }]
+    }
+  ]
+}

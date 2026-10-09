@@ -2,6 +2,7 @@ services:
   kafka:
     image: apache/kafka:latest
     container_name: rca-kafka
+    restart: unless-stopped
     ports:
       - "9092:9092" # EXTERNAL: Node.js chạy trên máy host
     environment:
@@ -26,6 +27,7 @@ services:
   clickhouse:
     image: clickhouse/clickhouse-server:latest
     container_name: rca-clickhouse
+    restart: unless-stopped
     depends_on:
       kafka:
         condition: service_healthy
@@ -42,3 +44,20 @@ services:
       nofile:
         soft: 262144
         hard: 262144
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: rca-grafana
+    restart: unless-stopped
+    depends_on:
+      - clickhouse
+    ports:
+      - "3000:3000"
+    environment:
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/cart-analytics.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
